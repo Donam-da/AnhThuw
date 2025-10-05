@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AnhThuw</title>
+  <meta http-equiv="Content-Security-Policy" content="frame-ancestors *">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+      cursor: none; /* giấu con trỏ cho cảm giác kiosk */
+    }
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+    }
+    /* Iframe phủ kín, không viền, không cuộn */
+    #frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <iframe id="frame"
+      src="about:blank"
+      allow="autoplay; fullscreen"
+      referrerpolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+    ></iframe>
+  </div>
+
+  <script>
+    (function () {
+      const URL_TO_SHOW = "https://taoanhdep.com/love/?b=eyJ0IjpbIlRodXciLCJjw7JuIiwibMOgIiwidGhp4bq/dSIsIm5oaSIsIkVtIiwidGjDrWNoIiwicXXDoCIsImfDrCIsIm7DrSJdLCJhIjoibm5jYSJ9";
+      const iframe = document.getElementById('frame');
+
+      // Chặn menu chuột phải, kéo/thả
+      window.addEventListener('contextmenu', e => e.preventDefault());
+      document.addEventListener('dragstart', e => e.preventDefault());
+
+      // Tải URL vào iframe ngay khi có thể
+      function loadIntoIframe() {
+        try {
+          iframe.src = URL_TO_SHOW;
+        } catch (e) {
+          // Nếu vì lý do gì đó không set được, chuyển hướng trực tiếp
+          safeRedirect();
+        }
+      }
+
+      // Xin fullscreen (chỉ chạy được sau 1 tương tác người dùng)
+      let requestedFS = false;
+      function requestFullscreenOnce() {
+        if (requestedFS) return;
+        requestedFS = true;
+        const root = document.documentElement;
+        const fs = root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen || root.msRequestFullscreen;
+        if (fs) { try { fs.call(root); } catch (_) {} }
+        // Thử phát sinh một kiểm tra xem iframe có bị chặn nhúng không
+        // Cách phát hiện tin cậy nhất vẫn là dự phòng chuyển hướng thủ công khi người dùng tương tác
+        setTimeout(checkAndFallback, 400);
+      }
+
+      // Nếu iframe bị chặn nhúng (site đặt X-Frame-Options/CSP), ta chuyển hướng trình duyệt thẳng sang URL
+      function safeRedirect() {
+        try {
+          window.location.replace(URL_TO_SHOW);
+        } catch (_) {
+          window.location.href = URL_TO_SHOW;
+        }
+      }
+
+      // Thử phát hiện trường hợp bị chặn nhúng:
+      // - Nhiều trình duyệt sẽ hiển thị lỗi thay vì nội dung.
+      // - Không thể truy cập contentDocument do cross-origin (điều này bình thường), nên ta dùng heuristic:
+      //   nếu sau một khoảng thời gian iframe vẫn là about:blank hoặc kích thước 0, chuyển hướng.
+      function checkAndFallback() {
+        try {
+          // Nếu iframe chưa rời about:blank (một số trình duyệt trả ''), coi như thất bại
+          const stillBlank = !iframe.src || iframe.src === 'about:blank';
+          const rect = iframe.getBoundingClientRect();
+          const collapsed = rect.width === 0 || rect.height === 0;
+          if (stillBlank || collapsed) {
+            safeRedirect();
+          }
+        } catch (_) {
+          // Nếu lỗi lạ, cứ chuyển hướng để đảm bảo nội dung hiển thị
+          safeRedirect();
+        }
+      }
+
+      // Khi DOM sẵn sàng, nạp ngay vào iframe
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        loadIntoIframe();
+      } else {
+        document.addEventListener('DOMContentLoaded', loadIntoIframe, { once: true });
+      }
+
+      // Lần tương tác đầu tiên => xin fullscreen & kiểm tra dự phòng
+      ['click', 'touchstart', 'keydown', 'mousemove'].forEach(evt => {
+        document.addEventListener(evt, requestFullscreenOnce, { once: true, passive: true });
+      });
+
+      // Nếu tab quay lại/hiển thị, đảm bảo iframe đã nạp
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && (!iframe.src || iframe.src === 'about:blank')) {
+          loadIntoIframe();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
